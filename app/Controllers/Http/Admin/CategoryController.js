@@ -72,7 +72,7 @@ class CategoryController {
     try {
       const category = await Category.findOrFail(params.id)
 
-      return response.send(category)
+      return response.send({ data: category })
     } catch (error) {
       return response.status(404).send({
         status: 'error',
@@ -101,7 +101,7 @@ class CategoryController {
       await category.save(trx)
       await trx.commit()
 
-      return response.send(category)
+      return response.send({ data: category })
     } catch(error) {
       await trx.rollback()
 
@@ -132,7 +132,7 @@ class CategoryController {
       return response.status(204).send()
     } catch (error) {
       await trx.rollback()
-      return response.status(400).send({
+      return response.status(500).send({
         status: 'error',
         message: 'There was an error deleting the category'
       })
