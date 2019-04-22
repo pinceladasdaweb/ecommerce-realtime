@@ -4,6 +4,9 @@
 /** @typedef {import('@adonisjs/framework/src/Response')} Response */
 /** @typedef {import('@adonisjs/framework/src/View')} View */
 
+const Product = use('App/Models/Product')
+const Database = use('Database')
+
 /**
  * Resourceful controller for interacting with products
  */
@@ -15,9 +18,18 @@ class ProductController {
    * @param {object} ctx
    * @param {Request} ctx.request
    * @param {Response} ctx.response
-   * @param {View} ctx.view
    */
-  async index ({ request, response, view }) {
+  async index ({ request, response, pagination }) {
+    const name = request.input('name')
+    const query = Product.query()
+
+    if (name) {
+      query.where('name', 'LIKE', `%${name}%`)
+    }
+
+    const products = await query.paginate(pagination.page, pagination.perPage)
+
+    return response.send(products)
   }
 
   /**
@@ -29,6 +41,23 @@ class ProductController {
    * @param {Response} ctx.response
    */
   async store ({ request, response }) {
+    const trx = await Database.beginTransaction()
+
+    try {
+      const { name, description, price, image_id } = request.all()
+      const product = await Product.create({ name, description, price, image_id }, trx)
+
+      await trx.commit()
+
+      return response.status(201).send({ data: product })
+    } catch(error) {
+      await trx.rollback()
+
+      return response.status(400).send({
+        status: 'error',
+        message: 'There was an error creating product'
+      })
+    }
   }
 
   /**
@@ -38,9 +67,18 @@ class ProductController {
    * @param {object} ctx
    * @param {Request} ctx.request
    * @param {Response} ctx.response
-   * @param {View} ctx.view
    */
-  async show ({ params, request, response, view }) {
+  async show ({ params, request, response }) {
+    try {
+      const product = await Product.findOrFail(params.id)
+
+      return response.send({ data: product })
+    } catch (error) {
+      return response.status(404).send({
+        status: 'error',
+        message: 'Product does not exist'
+      })
+    }
   }
 
   /**
@@ -52,6 +90,26 @@ class ProductController {
    * @param {Response} ctx.response
    */
   async update ({ params, request, response }) {
+    const trx = await Database.beginTransaction()
+
+    try {
+      const { name, description, price, image_id } = request.all()
+      const product = await Product.findOrFail(params.id)
+
+      product.merge({ name, description, price, image_id })
+
+      await product.save(trx)
+      await trx.commit()
+
+      return response.send({ data: product })
+    } catch(error) {
+      await trx.rollback()
+
+      return response.status(400).send({
+        status: 'error',
+        message: 'There was an error updating product'
+      })
+    }
   }
 
   /**
@@ -63,6 +121,22 @@ class ProductController {
    * @param {Response} ctx.response
    */
   async destroy ({ params, request, response }) {
+    const trx = await Database.beginTransaction()
+
+    try {
+      const product = await Product.find(params.id)
+
+      await product.delete(trx)
+      await trx.commit()
+
+      return response.status(204).send()
+    } catch (error) {
+      await trx.rollback()
+      return response.status(500).send({
+        status: 'error',
+        message: 'There was an error deleting the product'
+      })
+    }
   }
 }
 

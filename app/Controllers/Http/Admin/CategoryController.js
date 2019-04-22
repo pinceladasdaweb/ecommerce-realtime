@@ -4,6 +4,9 @@
 /** @typedef {import('@adonisjs/framework/src/Response')} Response */
 /** @typedef {import('@adonisjs/framework/src/View')} View */
 
+const Category = use('App/Models/Category')
+const Database = use('Database')
+
 /**
  * Resourceful controller for interacting with categories
  */
@@ -15,9 +18,18 @@ class CategoryController {
    * @param {object} ctx
    * @param {Request} ctx.request
    * @param {Response} ctx.response
-   * @param {View} ctx.view
    */
-  async index ({ request, response, view }) {
+  async index ({ request, response, pagination }) {
+    const title = request.input('title')
+    const query = Category.query()
+
+    if (title) {
+      query.where('title', 'LIKE', `%${title}%`)
+    }
+
+    const categories = await query.paginate(pagination.page, pagination.perPage)
+
+    return response.send(categories)
   }
 
   /**
@@ -29,6 +41,23 @@ class CategoryController {
    * @param {Response} ctx.response
    */
   async store ({ request, response }) {
+    const trx = await Database.beginTransaction()
+
+    try {
+      const { title, description, image_id } = request.all()
+      const category = await Category.create({ title, description, image_id }, trx)
+
+      await trx.commit()
+
+      return response.status(201).send({ data: category })
+    } catch(error) {
+      await trx.rollback()
+
+      return response.status(400).send({
+        status: 'error',
+        message: 'There was an error creating category'
+      })
+    }
   }
 
   /**
@@ -38,9 +67,18 @@ class CategoryController {
    * @param {object} ctx
    * @param {Request} ctx.request
    * @param {Response} ctx.response
-   * @param {View} ctx.view
    */
-  async show ({ params, request, response, view }) {
+  async show ({ params, request, response }) {
+    try {
+      const category = await Category.findOrFail(params.id)
+
+      return response.send({ data: category })
+    } catch (error) {
+      return response.status(404).send({
+        status: 'error',
+        message: 'Category does not exist'
+      })
+    }
   }
 
   /**
@@ -52,6 +90,26 @@ class CategoryController {
    * @param {Response} ctx.response
    */
   async update ({ params, request, response }) {
+    const trx = await Database.beginTransaction()
+
+    try {
+      const { title, description, image_id } = request.all()
+      const category = await Category.findOrFail(params.id)
+
+      category.merge({ title, description, image_id })
+
+      await category.save(trx)
+      await trx.commit()
+
+      return response.send({ data: category })
+    } catch(error) {
+      await trx.rollback()
+
+      return response.status(400).send({
+        status: 'error',
+        message: 'There was an error updating category'
+      })
+    }
   }
 
   /**
@@ -63,6 +121,22 @@ class CategoryController {
    * @param {Response} ctx.response
    */
   async destroy ({ params, request, response }) {
+    const trx = await Database.beginTransaction()
+
+    try {
+      const category = await Category.find(params.id)
+
+      await category.delete(trx)
+      await trx.commit()
+
+      return response.status(204).send()
+    } catch (error) {
+      await trx.rollback()
+      return response.status(500).send({
+        status: 'error',
+        message: 'There was an error deleting the category'
+      })
+    }
   }
 }
 
