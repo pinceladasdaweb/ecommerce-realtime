@@ -12,3 +12,6 @@ database/development.sqlite
 
 # OSX
 .DS_Store
+
+# Uploads
+public
