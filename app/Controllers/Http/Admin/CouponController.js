@@ -7,6 +7,7 @@
 const Coupon = use('App/Models/Coupon')
 const Service = use('App/Services/Coupon/CouponService')
 const Database = use('Database')
+const Transformer = use('App/Transformers/Admin/CouponTransformer')
 
 /**
  * Resourceful controller for interacting with coupons
@@ -20,7 +21,7 @@ class CouponController {
    * @param {Request} ctx.request
    * @param {Response} ctx.response
    */
-  async index ({ request, response, pagination }) {
+  async index ({ request, response, transform, pagination }) {
     const code = request.input('code')
     const query = Coupon.query()
 
@@ -30,7 +31,8 @@ class CouponController {
 
     const coupons = await query.paginate(pagination.page, pagination.perPage)
 
-    return response.send(coupons)
+    // return response.send(coupons)
+    return transform.paginate(coupons, Transformer)
   }
 
   /**
@@ -41,7 +43,7 @@ class CouponController {
    * @param {Request} ctx.request
    * @param {Response} ctx.response
    */
-  async store ({ request, response }) {
+  async store ({ request, response, transform }) {
     const trx = await Database.beginTransaction()
 
     try {
@@ -51,7 +53,7 @@ class CouponController {
       }
 
       const { code, discount, valid_from, valid_until, quantity, type, recursive, users, products } = request.all()
-      const coupon = await Coupon.create({ code, discount, valid_from, valid_until, quantity, type, recursive }, trx)
+      let coupon = await Coupon.create({ code, discount, valid_from, valid_until, quantity, type, recursive }, trx)
       const service = new Service(coupon, trx)
 
       if (users && users.length > 0) {
@@ -77,6 +79,8 @@ class CouponController {
       await coupon.save(trx)
       await trx.commit()
 
+      coupon = await transform.include('users,products').item(coupon, Transformer)
+
       return response.status(201).send({ data: coupon })
     } catch (error) {
       await trx.rollback()
@@ -96,9 +100,10 @@ class CouponController {
    * @param {Request} ctx.request
    * @param {Response} ctx.response
    */
-  async show ({ params, request, response }) {
+  async show ({ params, request, response, transform }) {
     try {
-      const coupon = await Coupon.findOrFail(params.id)
+      let coupon = await Coupon.findOrFail(params.id)
+      coupon = await transform.include('users,products,orders').item(coupon, Transformer)
 
       return response.send({ data: coupon })
     } catch (error) {
@@ -127,7 +132,7 @@ class CouponController {
       }
 
       const { code, discount, valid_from, valid_until, quantity, type, recursive, users, products } = request.all()
-      const coupon = await Coupon.findOrFail(params.id)
+      let coupon = await Coupon.findOrFail(params.id)
 
       coupon.merge({ code, discount, valid_from, valid_until, quantity, type, recursive, users, products })
 
@@ -153,6 +158,8 @@ class CouponController {
 
       await coupon.save(trx)
       await trx.commit()
+
+      coupon = await transform.item(coupon, Transformer)
 
       return response.send({ data: coupon })
     } catch (error) {

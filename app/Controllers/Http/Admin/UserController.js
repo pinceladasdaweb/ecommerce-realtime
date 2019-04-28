@@ -6,6 +6,7 @@
 
 const User = use('App/Models/User')
 const Database = use('Database')
+const Transformer = use('App/Transformers/Admin/UserTransformer')
 
 /**
  * Resourceful controller for interacting with users
@@ -19,7 +20,7 @@ class UserController {
    * @param {Request} ctx.request
    * @param {Response} ctx.response
    */
-  async index ({ request, response, pagination }) {
+  async index ({ request, response, transform, pagination }) {
     const name = request.input('name')
     const query = User.query()
 
@@ -29,7 +30,7 @@ class UserController {
 
     const users = await query.paginate(pagination.page, pagination.perPage)
 
-    return response.send(users)
+    return transform.paginate(users, Transformer)
   }
 
   /**
@@ -40,14 +41,16 @@ class UserController {
    * @param {Request} ctx.request
    * @param {Response} ctx.response
    */
-  async store ({ request, response }) {
+  async store ({ request, response, transform }) {
     const trx = await Database.beginTransaction()
 
     try {
       const { name, surname, email, password, image_id } = request.all()
-      const user = await User.create({ name, surname, email, password, image_id }, trx)
+      let user = await User.create({ name, surname, email, password, image_id }, trx)
 
       await trx.commit()
+
+      user = await transform.item(user, Transformer)
 
       return response.status(201).send({ data: user })
     } catch(error) {
@@ -68,9 +71,10 @@ class UserController {
    * @param {Request} ctx.request
    * @param {Response} ctx.response
    */
-  async show ({ params, request, response }) {
+  async show ({ params, request, response, transform }) {
     try {
-      const user = await User.findOrFail(params.id)
+      let user = await User.findOrFail(params.id)
+      user = await transform.item(user, Transformer)
 
       return response.send({ data: user })
     } catch (error) {
@@ -89,17 +93,19 @@ class UserController {
    * @param {Request} ctx.request
    * @param {Response} ctx.response
    */
-  async update ({ params, request, response }) {
+  async update ({ params, request, response, transform }) {
     const trx = await Database.beginTransaction()
 
     try {
       const { name, surname, email, password, image_id } = request.all()
-      const user = await User.findOrFail(params.id)
+      let user = await User.findOrFail(params.id)
 
       user.merge({ name, surname, email, password, image_id })
 
       await user.save(trx)
       await trx.commit()
+
+      user = await transform.item(user, Transformer)
 
       return response.send({ data: user })
     } catch(error) {

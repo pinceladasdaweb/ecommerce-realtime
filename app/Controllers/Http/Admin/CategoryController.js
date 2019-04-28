@@ -6,6 +6,7 @@
 
 const Category = use('App/Models/Category')
 const Database = use('Database')
+const Transformer = use('App/Transformers/Admin/CategoryTransformer')
 
 /**
  * Resourceful controller for interacting with categories
@@ -19,7 +20,7 @@ class CategoryController {
    * @param {Request} ctx.request
    * @param {Response} ctx.response
    */
-  async index ({ request, response, pagination }) {
+  async index ({ request, response, transform, pagination }) {
     const title = request.input('title')
     const query = Category.query()
 
@@ -29,7 +30,7 @@ class CategoryController {
 
     const categories = await query.paginate(pagination.page, pagination.perPage)
 
-    return response.send(categories)
+    return transform.paginate(categories, Transformer)
   }
 
   /**
@@ -40,14 +41,16 @@ class CategoryController {
    * @param {Request} ctx.request
    * @param {Response} ctx.response
    */
-  async store ({ request, response }) {
+  async store ({ request, response, transform }) {
     const trx = await Database.beginTransaction()
 
     try {
       const { title, description, image_id } = request.all()
-      const category = await Category.create({ title, description, image_id }, trx)
+      let category = await Category.create({ title, description, image_id }, trx)
 
       await trx.commit()
+
+      category = await transform.item(category, Transformer)
 
       return response.status(201).send({ data: category })
     } catch(error) {
@@ -68,9 +71,10 @@ class CategoryController {
    * @param {Request} ctx.request
    * @param {Response} ctx.response
    */
-  async show ({ params, request, response }) {
+  async show ({ params, request, response, transform }) {
     try {
-      const category = await Category.findOrFail(params.id)
+      let category = await Category.findOrFail(params.id)
+      category = await transform.item(category, Transformer)
 
       return response.send({ data: category })
     } catch (error) {
@@ -89,17 +93,19 @@ class CategoryController {
    * @param {Request} ctx.request
    * @param {Response} ctx.response
    */
-  async update ({ params, request, response }) {
+  async update ({ params, request, response, transform }) {
     const trx = await Database.beginTransaction()
 
     try {
       const { title, description, image_id } = request.all()
-      const category = await Category.findOrFail(params.id)
+      let category = await Category.findOrFail(params.id)
 
       category.merge({ title, description, image_id })
 
       await category.save(trx)
       await trx.commit()
+
+      category = await transform.item(category, Transformer)
 
       return response.send({ data: category })
     } catch(error) {
