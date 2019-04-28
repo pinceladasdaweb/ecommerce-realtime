@@ -16,3 +16,4 @@
 require('./auth')
 require('./admin')
 require('./client')
+require('./user')
