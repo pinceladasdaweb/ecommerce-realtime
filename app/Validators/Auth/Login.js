@@ -7,6 +7,14 @@ class Login {
       password: 'required'
     }
   }
+
+  get messages () {
+    return {
+      'email.required': 'Email is required.',
+      'email.email': 'Invalid email.',
+      'password.required': 'Password is required.'
+    }
+  }
 }
 
 module.exports = Login
