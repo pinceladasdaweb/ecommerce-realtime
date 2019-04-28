@@ -27,8 +27,7 @@ class OrderController {
     const query = Order.query()
 
     if (status && id) {
-      query.where('status', status)
-      query.orWhere('id', 'LIKE', `%${id}%`)
+      query.where('status', status).orWhere('id', 'LIKE', `%${id}%`)
     } else if (status) {
       query.where('status', status)
     } else if (id) {
@@ -170,7 +169,8 @@ class OrderController {
       const { code } = request.all()
       const coupon = await Coupon.findByOrFail('code', code.toUpperCase())
       const order = await Order.findOrFail(id)
-      const discount, info = {}
+      const discount = {}
+      const info = {}
 
       const service = new Service(order)
       const canAddDiscount = await service.canApplyDiscount(coupon)

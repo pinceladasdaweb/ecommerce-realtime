@@ -24,9 +24,7 @@ class UserController {
     const query = User.query()
 
     if (name) {
-      query.where('name', 'LIKE', `%${name}%`)
-      query.orWhere('surname', 'LIKE', `%${name}%`)
-      query.orWhere('email', 'LIKE', `%${name}%`)
+      query.where('name', 'LIKE', `%${name}%`).orWhere('surname', 'LIKE', `%${name}%`).orWhere('email', 'LIKE', `%${name}%`)
     }
 
     const users = await query.paginate(pagination.page, pagination.perPage)
