@@ -5,6 +5,7 @@
 /** @typedef {import('@adonisjs/framework/src/View')} View */
 
 const Image = use('App/Models/Image')
+const Transformer = use('App/Transformers/Admin/ImageTransformer')
 const Database = use('Database')
 const Helpers = use('Helpers')
 const fs = use('fs')
@@ -22,10 +23,10 @@ class ImageController {
    * @param {Request} ctx.request
    * @param {Response} ctx.response
    */
-  async index ({ request, response, pagination }) {
+  async index ({ request, response, pagination, transform }) {
     const images = await Image.query().orderBy('id', 'DESC').paginate(pagination.page, pagination.perPage)
 
-    return response.send(images)
+    return transform.paginate(images, Transformer)
   }
 
   /**
@@ -36,7 +37,7 @@ class ImageController {
    * @param {Request} ctx.request
    * @param {Response} ctx.response
    */
-  async store ({ request, response }) {
+  async store ({ request, response, transform }) {
     const trx = await Database.beginTransaction()
 
     try {
@@ -51,12 +52,14 @@ class ImageController {
         const file = await manage_single_upload(fileJar)
 
         if (file.moved()) {
-          const image = await Image.create({
+          let image = await Image.create({
             path: file.fileName,
             size: file.size,
             original_name: file.clientName,
             extension: file.subtype
           }, trx)
+
+          image = await transform.item(image, Transformer)
 
           images.push(image)
 
@@ -107,9 +110,10 @@ class ImageController {
    * @param {Request} ctx.request
    * @param {Response} ctx.response
    */
-  async show ({ params, request, response }) {
+  async show ({ params, request, response, transform }) {
     try {
-      const image = await Image.findOrFail(params.id)
+      let image = await Image.findOrFail(params.id)
+      image = await transform.item(image, Transformer)
 
       return response.send({ data: image })
     } catch (error) {
@@ -128,17 +132,19 @@ class ImageController {
    * @param {Request} ctx.request
    * @param {Response} ctx.response
    */
-  async update ({ params, request, response }) {
+  async update ({ params, request, response, transform }) {
     const trx = await Database.beginTransaction()
 
     try {
       const { original_name } = request.all()
-      const image = await Image.findOrFail(params.id)
+      let image = await Image.findOrFail(params.id)
 
       image.merge({ original_name })
 
       await image.save(trx)
       await trx.commit()
+
+      image = await transform.item(image, Transformer)
 
       return response.send({ data: image })
     } catch (error) {

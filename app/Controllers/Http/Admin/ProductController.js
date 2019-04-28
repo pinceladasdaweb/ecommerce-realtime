@@ -6,6 +6,7 @@
 
 const Product = use('App/Models/Product')
 const Database = use('Database')
+const Transformer = use('App/Transformers/Admin/ProductTransformer')
 
 /**
  * Resourceful controller for interacting with products
@@ -19,7 +20,7 @@ class ProductController {
    * @param {Request} ctx.request
    * @param {Response} ctx.response
    */
-  async index ({ request, response, pagination }) {
+  async index ({ request, response, transform, pagination }) {
     const name = request.input('name')
     const query = Product.query()
 
@@ -29,7 +30,7 @@ class ProductController {
 
     const products = await query.paginate(pagination.page, pagination.perPage)
 
-    return response.send(products)
+    return transform.paginate(products, Transformer)
   }
 
   /**
@@ -40,14 +41,16 @@ class ProductController {
    * @param {Request} ctx.request
    * @param {Response} ctx.response
    */
-  async store ({ request, response }) {
+  async store ({ request, response, transform }) {
     const trx = await Database.beginTransaction()
 
     try {
       const { name, description, price, image_id } = request.all()
-      const product = await Product.create({ name, description, price, image_id }, trx)
+      let product = await Product.create({ name, description, price, image_id }, trx)
 
       await trx.commit()
+
+      product = await transform.item(product, Transformer)
 
       return response.status(201).send({ data: product })
     } catch(error) {
@@ -68,9 +71,10 @@ class ProductController {
    * @param {Request} ctx.request
    * @param {Response} ctx.response
    */
-  async show ({ params, request, response }) {
+  async show ({ params, request, response, transform }) {
     try {
-      const product = await Product.findOrFail(params.id)
+      let product = await Product.findOrFail(params.id)
+      product = await transform.item(product, Transformer)
 
       return response.send({ data: product })
     } catch (error) {
@@ -89,17 +93,19 @@ class ProductController {
    * @param {Request} ctx.request
    * @param {Response} ctx.response
    */
-  async update ({ params, request, response }) {
+  async update ({ params, request, response, transform }) {
     const trx = await Database.beginTransaction()
 
     try {
       const { name, description, price, image_id } = request.all()
-      const product = await Product.findOrFail(params.id)
+      let product = await Product.findOrFail(params.id)
 
       product.merge({ name, description, price, image_id })
 
       await product.save(trx)
       await trx.commit()
+
+      product = await transform.item(product, Transformer)
 
       return response.send({ data: product })
     } catch(error) {
